@@ -237,17 +237,27 @@ X-Accel-Buffering: no
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | type | string | 是 | 操作类型：`"confirm_features"` / `"select_solution"` / `"regenerate"` |
-| data | object | 否 | 操作附加数据，默认为 `{}` |
+| data | object | 否 | 操作附加数据。后端不校验内部字段，只读取需要的键 |
+
+**`data` 内部字段说明**（根据 `type` 不同）：
+
+| `type` | `data` 有效字段 | 说明 |
+|--------|----------------|------|
+| `confirm_features` | `tech_structure` | JSON 字符串，写入 `session.tech_structure` |
+| `select_solution` | `selected_index` | 整数，选中方案的索引，写入 `session.current_solution` |
+| `regenerate` | — | 无需字段 |
+
+> **注意**：`data` 中传其他字段（如前端遗留的 `intent`、`tech_features` 等）不会报错，但后端不会读取或使用。
 
 **请求示例**:
 ```json
 {
   "thread_id": "agent-04cb1b4d487f",
-  "message": "请帮我生成交底书",
+  "message": "我已确认技术特征，请继续生成方案",
   "panel_action": {
     "type": "confirm_features",
     "data": {
-      "features": ["特征A", "特征B"]
+      "tech_structure": "{\"tech_features\": [\"特征A\", \"特征B\"], \"auxiliary_features\": []}"
     }
   }
 }
@@ -429,6 +439,156 @@ data: {"type": "...", "name": "...", "data": {...}}\n\n
 | 307 | 临时重定向 | 访问 `/` 重定向到前端页面 |
 | 400 | 请求参数错误 | 文件类型不支持、thread_id 无效、缺少必填参数 |
 | 413 | 请求实体过大 | 上传文件超过 50MB |
+
+---
+
+## 工作流请求体示例
+
+以下是在不同业务场景下，`POST /agent/chat` 的请求体写法。所有场景都基于同一个 `thread_id` 连续调用。
+
+### 场景 1：确认技术特征 → 生成方案
+
+**触发时机**：`extract_tech_structure` 提取完特征，用户在前端编辑框确认后。
+
+```json
+{
+  "thread_id": "agent-xxx",
+  "message": "我已确认技术特征，请继续生成方案",
+  "panel_action": {
+    "type": "confirm_features",
+    "data": {
+      "tech_structure": "{\"tech_features\": [\"单喷头结构实现双模灵活切换\", \"独立双电机供料控制方式\"], \"auxiliary_features\": []}"
+    }
+  }
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `type` | 必须是 `"confirm_features"` |
+| `data.tech_structure` | JSON 字符串，后端直接存入 `session.tech_structure` |
+
+**后端行为**：保存 `tech_structure` → Agent 调用 `generate_solutions()` → 自动调用 `evaluate_all_solutions()` → 返回评估面板。
+
+---
+
+### 场景 2：评估完成后 → 选择方案生成交底书
+
+**触发时机**：`evaluate_all_solutions` 评估完，用户在方案卡片点击"生成交底书"。
+
+```json
+{
+  "thread_id": "agent-xxx",
+  "message": "请为方案1生成交底书",
+  "panel_action": {
+    "type": "select_solution",
+    "data": {
+      "selected_index": 0
+    }
+  }
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `type` | `"select_solution"` |
+| `data.selected_index` | 方案索引，`0` = 第1个方案，`1` = 第2个方案... |
+
+**后端行为**：把 `session.solutions[selected_index]` 写入 `session.current_solution`，Agent 调用 `generate_disclosure()` 生成交底书。
+
+---
+
+### 场景 3：评估完成后 → 选择方案改进
+
+**触发时机**：用户在方案卡片点击"改进方案"。
+
+```json
+{
+  "thread_id": "agent-xxx",
+  "message": "请为方案1改进方案",
+  "panel_action": {
+    "type": "select_solution",
+    "data": {
+      "selected_index": 0
+    }
+  }
+}
+```
+
+**后端行为**：设置 `current_solution` → Agent 调用 `improve_solution()` → 自动调用 `evaluate_single_solution()` → 返回单方案评估面板。
+
+---
+
+### 场景 4：评估完成后 → 重新生成所有方案
+
+**触发时机**：用户点击"重新生成所有方案"。
+
+```json
+{
+  "thread_id": "agent-xxx",
+  "message": "请重新生成所有方案",
+  "panel_action": {
+    "type": "regenerate",
+    "data": {}
+  }
+}
+```
+
+**后端行为**：`regenerate` 不修改 session 状态，Agent 调用 `generate_solutions()` → 自动调用 `evaluate_all_solutions()`。
+
+---
+
+### 场景 5：改进后单个评估 → 继续改进 / 生成交底书
+
+**触发时机**：`evaluate_single_solution` 评估完，用户在单方案评估面板操作。
+
+**5a. 生成交底书**：
+```json
+{
+  "thread_id": "agent-xxx",
+  "message": "请生成交底书"
+}
+```
+
+**5b. 继续改进**：
+```json
+{
+  "thread_id": "agent-xxx",
+  "message": "请继续改进方案"
+}
+```
+
+**为什么不需要 `panel_action`？**
+
+因为 `improve_solution()` 已经把改进后的方案写入了 `session.current_solution`，`evaluate_single_solution()` 也把评估结果写入了 `session.rejection_reason`。此时 session 状态已经就绪，Agent 直接根据 `message` 内容就能调用正确的工具。
+
+---
+
+### 场景 6：纯聊天方式（不带 `panel_action`）
+
+如果你不想带 `panel_action`，只靠 `message` 让 Agent 自主判断：
+
+| 目的 | message | 前提条件 |
+|------|---------|----------|
+| 确认特征并生成方案 | `"我已确认技术特征，请继续生成方案"` | 需先通过其他方式把 `tech_structure` 写入 session |
+| 生成交底书 | `"生成交底书"` | `session.current_solution` 必须有值 |
+| 改进方案 | `"改进方案"` | `session.current_solution` 和 `session.rejection_reason` 必须有值 |
+| 重新生成方案 | `"重新生成方案"` | `session.tech_structure` 必须有值 |
+
+> ⚠️ **注意**：纯聊天方式在"选择方案"这一步有风险。不带 `select_solution` 面板操作时，`session.current_solution` 是空的，`generate_disclosure()` 和 `improve_solution()` 会拿到空内容。**场景 2/3 一定要带 `panel_action`**。
+
+---
+
+### 快速对照表
+
+| 前端操作 | `panel_action.type` | `data` | `message` |
+|---------|:-------------------:|--------|-----------|
+| 确认技术特征 | `confirm_features` | `{"tech_structure": "..."}` | `"我已确认技术特征，请继续生成方案"` |
+| 选择方案 → 生成交底书 | `select_solution` | `{"selected_index": 0}` | `"请为方案1生成交底书"` |
+| 选择方案 → 改进 | `select_solution` | `{"selected_index": 0}` | `"请为方案1改进方案"` |
+| 重新生成所有方案 | `regenerate` | `{}` | `"请重新生成所有方案"` |
+| 改进后 → 生成交底书 | **null** | — | `"请生成交底书"` |
+| 改进后 → 继续改进 | **null** | — | `"请继续改进方案"` |
 
 ---
 
