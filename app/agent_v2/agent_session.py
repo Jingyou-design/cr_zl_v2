@@ -1,7 +1,7 @@
 """
 Agent V2 会话状态管理与流式接口。
 负责：
-1. 维护内存会话存储（业务数据）；
+1. 维护内存会话存储（业务数据），支持 JSON 持久化；
 2. 管理 ContextVar 供工具访问当前 thread_id；
 3. 提供启动/继续对话的流式生成器。
 """
@@ -9,6 +9,7 @@ Agent V2 会话状态管理与流式接口。
 import json
 from contextvars import ContextVar
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import AsyncGenerator
 
 from langgraph.checkpoint.memory import MemorySaver
@@ -34,6 +35,10 @@ class AgentSession:
     final_disclosure: str = ""
 
 
+# ---------- 持久化配置 ----------
+
+_SESSION_FILE = Path(__file__).resolve().parent.parent.parent / "files" / "sessions.json"
+
 # ---------- 模块级状态 ----------
 
 _sessions: dict[str, AgentSession] = {}
@@ -42,12 +47,67 @@ _checkpointer = MemorySaver()
 current_thread_id: ContextVar[str] = ContextVar("current_thread_id", default="")
 
 
+# ---------- 持久化辅助 ----------
+
+def _save_sessions() -> None:
+    """将会话写入本地 JSON，服务重启后可恢复。"""
+    try:
+        data = {}
+        for tid, session in _sessions.items():
+            data[tid] = {
+                "thread_id": session.thread_id,
+                "document": session.document,
+                "tech_structure": session.tech_structure,
+                "solutions": session.solutions,
+                "current_solution": session.current_solution,
+                "selected_index": session.selected_index,
+                "evaluation_report": session.evaluation_report,
+                "evaluation_passed": session.evaluation_passed,
+                "rejection_reason": session.rejection_reason,
+                "revision_count": session.revision_count,
+                "final_disclosure": session.final_disclosure,
+            }
+        _SESSION_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _load_sessions() -> None:
+    """从本地 JSON 恢复会话。"""
+    global _sessions
+    if not _SESSION_FILE.exists():
+        return
+    try:
+        data = json.loads(_SESSION_FILE.read_text(encoding="utf-8"))
+        for tid, d in data.items():
+            _sessions[tid] = AgentSession(
+                thread_id=d.get("thread_id", tid),
+                document=d.get("document", ""),
+                tech_structure=d.get("tech_structure", ""),
+                solutions=d.get("solutions", []),
+                current_solution=d.get("current_solution", ""),
+                selected_index=d.get("selected_index", -1),
+                evaluation_report=d.get("evaluation_report", ""),
+                evaluation_passed=d.get("evaluation_passed", False),
+                rejection_reason=d.get("rejection_reason", ""),
+                revision_count=d.get("revision_count", 0),
+                final_disclosure=d.get("final_disclosure", ""),
+            )
+    except Exception:
+        pass
+
+
+# 启动时自动恢复
+_load_sessions()
+
+
 # ---------- 会话 CRUD ----------
 
 def create_session(thread_id: str, document: str) -> AgentSession:
     """创建新会话并存储。"""
     session = AgentSession(thread_id=thread_id, document=document)
     _sessions[thread_id] = session
+    _save_sessions()
     return session
 
 
@@ -90,10 +150,13 @@ def update_session_from_panel(thread_id: str, panel_action: dict) -> None:
         # 无需改状态，agent 会重新调用 generate_solutions
         pass
 
+    _save_sessions()
+
 
 def delete_session(thread_id: str) -> None:
     """删除会话。"""
     _sessions.pop(thread_id, None)
+    _save_sessions()
 
 
 def get_checkpointer() -> MemorySaver:
@@ -143,6 +206,15 @@ async def stream_agent_chat(
 
     if panel_action:
         update_session_from_panel(thread_id, panel_action)
+
+    # 防御：内存会话可能因服务重启丢失，提前给出友好提示
+    if thread_id not in _sessions:
+        yield {
+            "type": "error",
+            "name": "",
+            "data": {"message": f"会话 {thread_id} 已过期，请返回首页重新上传文档开始分析。"},
+        }
+        return
 
     current_thread_id.set(thread_id)
 

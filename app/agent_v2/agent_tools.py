@@ -331,13 +331,18 @@ async def improve_solution() -> str:
                 请输出列举出实用性的创新点："""
     innovation = await _stream_llm(prompt3, llm=_llm_creative)
 
-    # Step 4: 生成改进方案
-    prompt4 = f"""基于以下提取创新点，生成一个完整的技术方案。
+    # Step 4: 生成改进方案（只输出发明内容，不输出完整交底书）
+    prompt4 = f"""基于以下提取创新点，生成技术方案的"发明内容"部分。
 
             提取创新点：
             {innovation}
 
-            请输出详细方案："""
+            要求：
+            - 只输出发明内容，包括：要解决的技术问题、技术方案、有益效果
+            - 不要输出技术领域、背景技术、具体实施方式、附图说明等其他章节
+            - 保持简洁，突出核心创新点，500字以内
+
+            请输出发明内容："""
     improved_solution = await _stream_llm(prompt4, llm=_llm_creative)
 
     session.current_solution = improved_solution
