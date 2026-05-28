@@ -33,6 +33,7 @@ class AgentSession:
     rejection_reason: str = ""
     revision_count: int = 0
     final_disclosure: str = ""
+    searched_patents: list = field(default_factory=list)
 
 
 # ---------- 持久化配置 ----------
@@ -66,6 +67,7 @@ def _save_sessions() -> None:
                 "rejection_reason": session.rejection_reason,
                 "revision_count": session.revision_count,
                 "final_disclosure": session.final_disclosure,
+                "searched_patents": session.searched_patents,
             }
         _SESSION_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     except Exception:
@@ -92,6 +94,7 @@ def _load_sessions() -> None:
                 rejection_reason=d.get("rejection_reason", ""),
                 revision_count=d.get("revision_count", 0),
                 final_disclosure=d.get("final_disclosure", ""),
+                searched_patents=d.get("searched_patents", []),
             )
     except Exception:
         pass

@@ -1090,7 +1090,7 @@ function goBack() {
 
   // Cleanup session
   if (state.threadId) {
-    navigator.sendBeacon('/agent/cleanup', JSON.stringify({ thread_id: state.threadId }));
+    navigator.sendBeacon('/agent/cleanup?thread_id=' + encodeURIComponent(state.threadId));
   }
 
   state.threadId = null;
@@ -1109,7 +1109,7 @@ function goBack() {
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {
   if (state.threadId) {
-    navigator.sendBeacon('/agent/cleanup', JSON.stringify({ thread_id: state.threadId }));
+    navigator.sendBeacon('/agent/cleanup?thread_id=' + encodeURIComponent(state.threadId));
   }
 });
 </script>

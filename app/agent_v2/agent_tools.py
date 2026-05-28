@@ -297,6 +297,26 @@ async def improve_solution() -> str:
     document = session.document
     rejection_reason = session.rejection_reason
     current_solution = session.current_solution
+    searched_patents = session.searched_patents
+
+    # 构建检索到的专利对比提示（如有）
+    patent_hint = ""
+    if searched_patents:
+        patent_summaries = []
+        for i, p in enumerate(searched_patents, 1):
+            summary = f"专利{i} [{p.get('patent_number', '')}]：{p.get('title', '')}\n摘要：{p.get('abstract', '')[:300]}\n"
+            claims = p.get('claims', '')
+            if claims:
+                # 只取前3条权利要求，避免超出上下文
+                claim_lines = claims.split('\n')[:3]
+                summary += "权利要求（前3条）：\n" + "\n".join(claim_lines) + "\n"
+            patent_summaries.append(summary)
+        patent_hint = (
+            "\n【检索到的对比专利】\n"
+            + "\n".join(patent_summaries)
+            + "\n请在分析技术缺陷和列举创新点时，主动与上述检索到的专利进行对比，"
+            + "明确指出本方案与现有技术的差异点和改进空间。\n"
+        )
 
     # Step 1: 提取技术点
     prompt1 = f"""请从以下文档中提取关键技术点或结构信息。只输出提取结果，不要有多余解释。
@@ -308,7 +328,7 @@ async def improve_solution() -> str:
     tech_structure = await _stream_llm(prompt1, llm=_llm_zero)
 
     # Step 2: 分析技术缺陷
-    prompt2 = f"""基于以下提取的技术/结构信息，分析技术缺陷，列举分析结果，不要有多余解释。
+    prompt2 = f"""基于以下提取的技术/结构信息，分析技术缺陷，列举分析结果，不要有多余解释。{patent_hint}
 
             分析的技术/结构：
             {tech_structure}
@@ -323,7 +343,7 @@ async def improve_solution() -> str:
             f"\n【特别说明】上一轮方案在专利评估中被指出存在以下问题，"
             f"请在创新点列举中重点关注并避免：\n{rejection_reason}\n"
         )
-    prompt3 = f"""针对以下提取的技术缺陷/不足，列举出实用性的创新点，不要有多余解释。{feedback_hint}
+    prompt3 = f"""针对以下提取的技术缺陷/不足，列举出实用性的创新点，不要有多余解释。{patent_hint}{feedback_hint}
 
                 提取的缺陷/不足：
                 {issues}
@@ -436,7 +456,69 @@ async def evaluate_single_solution() -> str:
     return f"评估完成，结果为{'通过' if passed else '不通过'}。请向用户展示评估结果并等待决策。绝不能自动执行下一步。"
 
 
-# ---------- 工具 6: 生成交底书 ----------
+# ---------- 工具 6: 检索专利 ----------
+
+@tool
+async def search_patent(patent_number: str) -> str:
+    """根据专利号检索专利信息。
+    当用户要求查询某个具体专利号（如 CN114352908A）时使用此工具，
+    返回专利的标题、摘要、权利要求、说明书等关键信息。"""
+    skill_path = _PROJECT_ROOT / "skills" / "patenthub" / "scripts"
+    if str(skill_path) not in sys.path:
+        sys.path.insert(0, str(skill_path))
+
+    from patenthub_client import api_get
+
+    # Step 1: 搜索专利
+    search_result = api_get("/api/s", {"q": f"number:{patent_number}", "ps": 1})
+    if not search_result["success"]:
+        return f"检索失败：{search_result.get('error', '未知错误')}"
+
+    patents = search_result["data"].get("patents", [])
+    if not patents:
+        return f"未找到专利号 {patent_number} 的相关专利。"
+
+    patent = patents[0]
+    patent_id = patent.get("id")
+
+    # Step 2: 获取基本信息
+    base_result = api_get("/api/patent/base", {"id": patent_id})
+    base_info = base_result["data"].get("patent", {}) if base_result["success"] else {}
+
+    # Step 3: 获取权利要求
+    claims_result = api_get("/api/patent/claims", {"id": patent_id})
+    claims_info = claims_result["data"].get("patent", {}) if claims_result["success"] else {}
+    if claims_info and "claims" in claims_info:
+        claims_info["claims"] = claims_info["claims"].replace("<br/>", "\n")
+
+    # Step 4: 获取说明书
+    desc_result = api_get("/api/patent/desc", {"id": patent_id})
+    desc_info = desc_result["data"].get("patent", {}) if desc_result["success"] else {}
+    if desc_info and "description" in desc_info:
+        desc_info["description"] = desc_info["description"].replace("<br/>", "\n")
+
+    # 组装结果
+    result = {
+        "patent_number": patent_number,
+        "title": base_info.get("title", ""),
+        "abstract": base_info.get("abstract", ""),
+        "applicant": base_info.get("applicant", ""),
+        "inventor": base_info.get("inventor", ""),
+        "application_number": base_info.get("applicationNumber", ""),
+        "publication_number": base_info.get("publicationNumber", ""),
+        "ipc": base_info.get("ipc", ""),
+        "claims": claims_info.get("claims", ""),
+        "description": desc_info.get("description", ""),
+    }
+
+    # 存入 session，供后续改进方案时参考
+    session = get_session()
+    session.searched_patents.append(result)
+
+    return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+# ---------- 工具 7: 生成交底书 ----------
 
 @tool
 async def generate_disclosure() -> str:

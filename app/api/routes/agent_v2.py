@@ -59,10 +59,6 @@ class ParseRequest(BaseModel):
     model_version: Optional[str] = "vlm"
 
 
-class CleanupRequest(BaseModel):
-    thread_id: str
-
-
 # ---------- SSE 辅助 ----------
 
 async def _sse_generator(session_gen):
@@ -196,9 +192,11 @@ async def chat_agent(req: ChatRequest):
 # ---------- 清理端点 ----------
 
 @router.post("/cleanup")
-async def cleanup_session(req: CleanupRequest):
-    """清理会话：删除上传文件、MinerU 输出、交底书输出、Agent 会话状态。"""
-    thread_id = req.thread_id
+async def cleanup_session(thread_id: str):
+    """清理会话：删除上传文件、MinerU 输出、交底书输出、Agent 会话状态。
+    thread_id 通过 query 参数传递，以兼容 navigator.sendBeacon（不支持自定义 Content-Type）。
+    """
+    thread_id = thread_id
     if not thread_id.startswith("agent-"):
         raise HTTPException(status_code=400, detail="无效的 thread_id")
 
