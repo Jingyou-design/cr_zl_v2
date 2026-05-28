@@ -1,0 +1,6 @@
+Code: F99
+Level: class
+Section: 武器；爆破
+Title: 本部其他类目不包括的技术主题
+========================================
+(no additional notes)

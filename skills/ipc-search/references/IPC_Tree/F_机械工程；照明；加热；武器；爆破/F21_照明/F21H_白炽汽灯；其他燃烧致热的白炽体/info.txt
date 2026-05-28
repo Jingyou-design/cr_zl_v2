@@ -1,0 +1,6 @@
+Code: F21H
+Level: subclass
+Section: 发动机或泵
+Title: 白炽汽灯；其他燃烧致热的白炽体
+========================================
+(no additional notes)

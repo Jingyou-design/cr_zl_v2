@@ -1,0 +1,6 @@
+Code: F02
+Level: class
+Section: 发动机或泵
+Title: 燃烧发动机；热气或燃烧生成物的发动机装置
+========================================
+(no additional notes)

@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>专利方案生成 (Agent V2)</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"></script>
+<style>
+:root {
+  --bg: #f7f8fa;
+  --card: #ffffff;
+  --border: #e5e7eb;
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --primary-light: #eef2ff;
+  --text: #1f2937;
+  --text2: #6b7280;
+  --success: #10b981;
+  --success-bg: #ecfdf5;
+  --danger: #ef4444;
+  --danger-bg: #fef2f2;
+  --warning: #f59e0b;
+  --warning-bg: #fffbeb;
+  --agent-bg: #f0f4ff;
+  --user-bg: #e8faf0;
+  --radius: 12px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+/* ---- Pages ---- */
+.page { display:none; min-height:100vh; }
+.page.active { display:flex; flex-direction:column; }
+
+/* ---- Upload Page ---- */
+#page-upload { align-items:center; justify-content:center; padding:40px 20px; }
+.upload-container { max-width:640px; width:100%; }
+.upload-title { font-size:24px; font-weight:700; margin-bottom:8px; text-align:center; }
+.upload-subtitle { font-size:14px; color:var(--text2); margin-bottom:32px; text-align:center; }
+.upload-zone { border:2px dashed var(--border); border-radius:var(--radius); padding:48px 24px; text-align:center; cursor:pointer; transition:all .2s; background:var(--card); }
+.upload-zone:hover,.upload-zone.drag-over { border-color:var(--primary); background:var(--primary-light); }
+.upload-zone-icon { font-size:40px; margin-bottom:12px; }
+.upload-zone-text { font-size:14px; color:var(--text2); margin-bottom:4px; }
+.upload-zone-hint { font-size:12px; color:var(--text2); opacity:.7; }
+.manual-section { margin-top:24px; }
+.manual-section label { display:block; font-size:13px; font-weight:600; margin-bottom:6px; color:var(--text2); }
+.manual-section textarea { width:100%; height:160px; border:1px solid var(--border); border-radius:8px; padding:12px; font-size:14px; resize:vertical; font-family:inherit; }
+.manual-section textarea:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(79,70,229,.1); }
+.start-btn { margin-top:20px; width:100%; padding:14px; background:var(--primary); color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; transition:background .2s; }
+.start-btn:hover { background:var(--primary-hover); }
+.start-btn:disabled { opacity:.5; cursor:not-allowed; }
+.parsing-status { margin-top:16px; padding:12px 16px; background:var(--warning-bg); border-radius:8px; font-size:13px; color:#92400e; display:none; }
+.parsing-status.show { display:block; }
+
+/* ---- Chat Page ---- */
+#page-chat { height:100vh; }
+.chat-header { padding:12px 20px; background:var(--card); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+.chat-header-left { display:flex; align-items:center; gap:10px; }
+.chat-header-title { font-size:16px; font-weight:700; }
+.back-btn { background:none; border:1px solid var(--border); border-radius:6px; padding:6px 12px; font-size:13px; cursor:pointer; color:var(--text2); transition:all .2s; }
+.back-btn:hover { border-color:var(--primary); color:var(--primary); }
+.chat-status { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text2); }
+.chat-status .dot { width:8px; height:8px; border-radius:50%; background:#ccc; }
+.chat-status .dot.active { background:var(--success); animation:pulse 1.5s infinite; }
+.chat-status .dot.error { background:var(--danger); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* Chat messages */
+.chat-messages { flex:1; overflow-y:auto; padding:20px; }
+.chat-inner { max-width:760px; margin:0 auto; display:flex; flex-direction:column; gap:16px; }
+
+/* Message bubbles */
+.msg { display:flex; gap:10px; }
+.msg.agent { justify-content:flex-start; }
+.msg.user { justify-content:flex-end; }
+.msg-avatar { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; flex-shrink:0; }
+.msg.agent .msg-avatar { background:var(--agent-bg); color:var(--primary); }
+.msg.user .msg-avatar { background:var(--user-bg); color:var(--success); }
+.msg-body { max-width:85%; }
+.msg-text { padding:10px 14px; border-radius:var(--radius); font-size:14px; line-height:1.6; white-space:pre-wrap; word-break:break-word; }
+.msg.agent .msg-text { background:var(--agent-bg); border-top-left-radius:4px; white-space:normal; }
+.msg.user .msg-text { background:var(--user-bg); border-top-right-radius:4px; }
+
+/* Tool indicator */
+.tool-indicator { padding:6px 12px; font-size:12px; color:var(--text2); font-style:italic; background:var(--primary-light); border-radius:16px; align-self:center; }
+.tool-indicator .spinner { display:inline-block; width:12px; height:12px; border:2px solid var(--border); border-top-color:var(--primary); border-radius:50%; animation:spin .8s linear infinite; vertical-align:middle; margin-right:4px; }
+@keyframes spin { to{transform:rotate(360deg)} }
+
+/* Panel (inline in chat) */
+.panel { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-top:4px; }
+.panel-title { font-size:14px; font-weight:700; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+.panel-title .icon { font-size:16px; }
+
+/* Feature editor panel */
+.feature-list { margin-bottom:10px; }
+.feature-list h4 { font-size:13px; color:var(--text2); margin-bottom:6px; }
+.feature-list ul { list-style:none; padding:0; }
+.feature-list li { display:flex; align-items:center; gap:6px; padding:4px 0; font-size:13px; }
+.feature-list li .remove-btn { background:none; border:none; color:var(--danger); cursor:pointer; font-size:16px; padding:0 4px; }
+.feature-add { display:flex; gap:6px; margin-top:6px; }
+.feature-add input { flex:1; padding:6px 10px; border:1px solid var(--border); border-radius:6px; font-size:13px; }
+.feature-add button { padding:6px 12px; background:var(--primary); color:#fff; border:none; border-radius:6px; font-size:12px; cursor:pointer; }
+.json-toggle { font-size:12px; color:var(--primary); cursor:pointer; margin-bottom:8px; }
+.json-editor { width:100%; min-height:100px; border:1px solid var(--border); border-radius:6px; padding:8px; font-family:monospace; font-size:12px; display:none; }
+.json-editor.show { display:block; }
+.panel-actions { margin-top:12px; display:flex; gap:8px; justify-content:flex-end; }
+.panel-btn { padding:8px 16px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; border:none; transition:all .2s; }
+.panel-btn-primary { background:var(--primary); color:#fff; }
+.panel-btn-primary:hover { background:var(--primary-hover); }
+.panel-btn-secondary { background:var(--bg); color:var(--text); border:1px solid var(--border); }
+.panel-btn-secondary:hover { border-color:var(--primary); }
+.panel-btn-danger { background:var(--danger-bg); color:var(--danger); border:1px solid transparent; }
+.panel-btn-danger:hover { border-color:var(--danger); }
+
+/* Solution cards panel */
+.solution-card { background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:10px; }
+.solution-card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+.solution-card-title { font-size:14px; font-weight:600; }
+.badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; }
+.badge-pass { background:var(--success-bg); color:var(--success); }
+.badge-fail { background:var(--danger-bg); color:var(--danger); }
+.solution-card-content { font-size:13px; line-height:1.5; color:var(--text2); margin-bottom:8px; }
+.solution-card-report { font-size:12px; color:var(--text2); max-height:0; overflow:hidden; transition:max-height .3s; }
+.solution-card-report.expanded { max-height:500px; overflow-y:auto; }
+.report-toggle { font-size:12px; color:var(--primary); cursor:pointer; }
+.solution-card-actions { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+
+/* Single review panel */
+.eval-result { display:flex; align-items:center; gap:8px; margin-bottom:10px; font-size:15px; font-weight:600; }
+.eval-result.pass { color:var(--success); }
+.eval-result.fail { color:var(--danger); }
+.eval-reason { font-size:13px; color:var(--text2); margin-bottom:10px; padding:8px; background:var(--danger-bg); border-radius:6px; }
+
+/* Eval timer */
+.eval-timer { display:inline-flex; align-items:center; gap:6px; padding:4px 12px; background:var(--warning-bg); border-radius:16px; font-size:12px; color:#92400e; margin:4px 0; }
+
+/* Disclosure */
+.disclosure-content { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:16px; margin-top:4px; max-height:400px; overflow-y:auto; font-size:14px; line-height:1.7; }
+.disclosure-content h1,.disclosure-content h2,.disclosure-content h3 { margin:12px 0 6px; }
+.disclosure-content p { margin:6px 0; }
+.download-link { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; background:var(--success-bg); color:var(--success); border-radius:6px; text-decoration:none; font-size:13px; font-weight:600; margin-top:8px; }
+.download-link:hover { background:#d1fae5; }
+
+/* Chat input */
+.chat-input-wrapper { padding:12px 20px; background:var(--card); border-top:1px solid var(--border); flex-shrink:0; }
+.chat-input-inner { max-width:760px; margin:0 auto; display:flex; gap:8px; }
+.chat-input-inner input { flex:1; padding:10px 14px; border:1px solid var(--border); border-radius:8px; font-size:14px; font-family:inherit; }
+.chat-input-inner input:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(79,70,229,.1); }
+.send-btn { padding:10px 20px; background:var(--primary); color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; transition:background .2s; }
+.send-btn:hover { background:var(--primary-hover); }
+.send-btn:disabled { opacity:.5; cursor:not-allowed; }
+
+/* Agent thinking collapsible */
+.agent-thinking { border:1px solid var(--border); border-radius:8px; padding:8px 12px; background:var(--bg); margin-top:4px; }
+.agent-thinking summary { font-size:12px; color:var(--text2); cursor:pointer; user-select:none; padding:2px 0; }
+.agent-thinking .thinking-content { margin-top:8px; font-size:13px; color:var(--text2); max-height:300px; overflow-y:auto; line-height:1.5; }
+.agent-thinking .thinking-content p { margin:4px 0; }
+.agent-thinking .thinking-content pre { background:var(--card); padding:8px; border-radius:4px; overflow-x:auto; font-size:12px; }
+/* Markdown in messages */
+.msg-text p { margin:4px 0; }
+.msg-text pre { background:var(--bg); padding:8px; border-radius:6px; overflow-x:auto; }
+.msg-text code { font-size:13px; }
+.msg-text ul, .msg-text ol { padding-left:20px; margin:4px 0; }
+
+/* Error message in chat */
+.msg-error { padding:10px 14px; background:var(--danger-bg); color:var(--danger); border-radius:var(--radius); font-size:13px; }
+</style>
+</head>
+<body>
+
+<!-- ============ Upload Page ============ -->
+<div id="page-upload" class="page active">
+  <div class="upload-container">
+    <div class="upload-title">专利方案生成与评估 (Agent V2)</div>
+    <div class="upload-subtitle">上传专利文档或粘贴文本，AI Agent 将通过对话完成分析</div>
+    <div class="upload-zone" id="uploadZone">
+      <div class="upload-zone-icon">&#128196;</div>
+      <div class="upload-zone-text">拖拽文件到此处，或点击选择文件</div>
+      <div class="upload-zone-hint">支持 PDF, DOCX, PPTX, 图片等格式，最大 50MB</div>
+      <input type="file" id="fileInput" style="display:none" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.bmp,.webp">
+    </div>
+    <div class="parsing-status" id="parsingStatus"></div>
+    <div class="manual-section">
+      <label>或直接输入专利文本：</label>
+      <textarea id="manualText" placeholder="在此粘贴专利文档内容..."></textarea>
+    </div>
+    <button class="start-btn" id="startBtn" onclick="handleStart()">开始分析</button>
+  </div>
+</div>
+
+<!-- ============ Chat Page ============ -->
+<div id="page-chat" class="page">
+  <div class="chat-header">
+    <div class="chat-header-left">
+      <button class="back-btn" onclick="goBack()">&#8592; 返回</button>
+      <span class="chat-header-title">专利分析对话</span>
+    </div>
+    <div class="chat-status">
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText">就绪</span>
+    </div>
+  </div>
+  <div class="chat-messages" id="chatMessages">
+    <div class="chat-inner" id="chatInner"></div>
+  </div>
+  <div class="chat-input-wrapper">
+    <div class="chat-input-inner">
+      <input type="text" id="chatInput" placeholder="输入消息..." onkeydown="if(event.key==='Enter')sendMessage()">
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()">发送</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ State ============
+const state = {
+  threadId: null,
+  uploadFilePath: null,
+  uploadFileName: null,
+  isRunning: false,
+  currentReader: null,
+  evalTimerId: null,
+  evalStartTime: null,
+  suppressAgentMsg: false,  // 收到 panel 后屏蔽 Agent 的确认消息
+};
+
+// ============ Page Navigation ============
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+}
+
+// ============ Upload Handling ============
+const uploadZone = document.getElementById('uploadZone');
+const fileInput = document.getElementById('fileInput');
+
+uploadZone.addEventListener('click', () => fileInput.click());
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag-over');
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
+
+async function handleFile(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const r = await fetch('/agent/upload', { method: 'POST', body: formData });
+    const data = await r.json();
+    state.threadId = data.thread_id;
+    state.uploadFilePath = data.file_path;
+    state.uploadFileName = data.filename;
+    uploadZone.innerHTML = `<div style="font-size:14px;color:var(--success)">&#10003; 已上传: ${data.filename} (${(data.file_size/1024).toFixed(1)} KB)</div>`;
+
+    // Parse with MinerU
+    const ps = document.getElementById('parsingStatus');
+    ps.textContent = '正在解析文档...';
+    ps.classList.add('show');
+    parseDocument(data.thread_id, data.file_path, data.filename);
+  } catch (err) {
+    alert('上传失败: ' + err.message);
+  }
+}
+
+async function parseDocument(threadId, filePath, filename) {
+  try {
+    const r = await fetch('/agent/parse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ thread_id: threadId, file_path: filePath, filename: filename }),
+    });
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let markdown = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop();
+      for (const chunk of lines) {
+        if (!chunk.trim().startsWith('data:')) continue;
+        const jsonStr = chunk.slice(5).trim();
+        try {
+          const evt = JSON.parse(jsonStr);
+          if (evt.type === 'mineru_done' && evt.data && evt.data.markdown) {
+            markdown = evt.data.markdown;
+          }
+        } catch (e) {}
+      }
+    }
+    const ps = document.getElementById('parsingStatus');
+    if (markdown) {
+      ps.textContent = '解析完成';
+      document.getElementById('manualText').value = markdown;
+    } else {
+      ps.textContent = '解析未返回内容，请手动输入文本';
+    }
+  } catch (err) {
+    document.getElementById('parsingStatus').textContent = '解析失败: ' + err.message;
+  }
+}
+
+// ============ Start Session ============
+async function handleStart() {
+  const docText = document.getElementById('manualText').value.trim();
+  if (!docText) { alert('请输入专利文档内容'); return; }
+
+  showPage('chat');
+  setStatus('active', '处理中');
+  state.isRunning = true;
+
+  addAgentMessage('正在启动分析...');
+
+  try {
+    console.log('[V2] Starting session, threadId:', state.threadId, 'docLen:', docText.length);
+    const r = await fetch('/agent/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ document: docText, thread_id: state.threadId }),
+    });
+    console.log('[V2] Response status:', r.status, r.ok);
+    if (!r.ok) {
+      const errText = await r.text();
+      addErrorMessage('请求失败: ' + r.status + ' ' + errText);
+      setStatus('error', '请求失败');
+      state.isRunning = false;
+      return;
+    }
+    await readSSE(r, handleEvent);
+  } catch (err) {
+    console.error('[V2] Start error:', err);
+    addErrorMessage('连接失败: ' + err.message);
+    setStatus('error', '连接失败');
+  }
+  // Finalize any remaining agent message after stream ends
+  finalizeCurrentAgentMsg(false);
+  state.isRunning = false;
+  setStatus('idle', '就绪');
+}
+
+// ============ SSE Reading ============
+async function readSSE(response, onEvent) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  state.currentReader = reader;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) { console.log('[V2] SSE stream done'); break; }
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop();
+      for (const chunk of lines) {
+        if (!chunk.trim().startsWith('data:')) continue;
+        const jsonStr = chunk.slice(5).trim();
+        try {
+          const evt = JSON.parse(jsonStr);
+          onEvent(evt);
+        } catch (e) {
+          console.warn('[V2] SSE parse error:', jsonStr.substring(0, 100));
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[V2] SSE read error:', err);
+    onEvent({ type: 'error', data: { message: '连接已断开: ' + err.message } });
+  }
+  state.currentReader = null;
+}
+
+// ============ Event Handler ============
+let currentAgentMsg = null;  // current agent message element for streaming
+let currentDisclosureEl = null;
+
+/** Finalize the current agent message: render markdown and optionally wrap in collapsible */
+function finalizeCurrentAgentMsg(wrapInCollapsible = false) {
+  if (!currentAgentMsg) return;
+  const textEl = currentAgentMsg.querySelector('.msg-text');
+  if (textEl && textEl._rawText && textEl._rawText.trim()) {
+    const raw = textEl._rawText;
+    if (wrapInCollapsible) {
+      textEl.innerHTML = `<details class="agent-thinking"><summary>Agent 分析过程</summary><div class="thinking-content">${marked.parse(raw)}</div></details>`;
+    } else {
+      textEl.innerHTML = marked.parse(raw);
+    }
+  }
+  currentAgentMsg = null;
+}
+
+function handleEvent(evt) {
+  const { type, name, data } = evt;
+
+  switch (type) {
+    case 'meta':
+      if (name === 'thread_id' && data.thread_id) {
+        state.threadId = data.thread_id;
+      }
+      break;
+
+    case 'token':
+      if (name === 'agent') {
+        // 收到结构化 panel 后，屏蔽 Agent 的确认消息（避免长文本/重复内容堆积）
+        if (state.suppressAgentMsg) return;
+        // Streaming agent text response - accumulate raw text and render markdown
+        if (!currentAgentMsg) {
+          currentAgentMsg = addAgentMessage('');
+        }
+        const textEl = currentAgentMsg.querySelector('.msg-text');
+        textEl._rawText = (textEl._rawText || '') + (data.token || '');
+        textEl.innerHTML = marked.parse(textEl._rawText);
+        smartScroll();
+      } else if (name === 'disclosure') {
+        // Streaming disclosure text
+        if (!currentDisclosureEl) {
+          currentDisclosureEl = document.createElement('div');
+          currentDisclosureEl.className = 'disclosure-content';
+          currentAgentMsg = addAgentMessage('');
+          currentAgentMsg.querySelector('.msg-text').appendChild(currentDisclosureEl);
+        }
+        currentDisclosureEl._rawText = (currentDisclosureEl._rawText || '') + (data.token || '');
+        currentDisclosureEl.innerHTML = marked.parse(currentDisclosureEl._rawText);
+        smartScroll();
+      }
+      break;
+
+    case 'tool_start':
+      // Wrap preceding agent analysis text in collapsible <details>
+      finalizeCurrentAgentMsg(true);
+      currentDisclosureEl = null;
+      // 评估工具执行期间屏蔽 Agent 原始输出，避免长文本堆积导致前端卡顿
+      state.suppressAgentMsg = (name === 'evaluate_all_solutions' || name === 'evaluate_single_solution');
+      addToolIndicator(name);
+      if (state.suppressAgentMsg) {
+        showEvalTimer(name === 'evaluate_all_solutions' ? '正在评估所有方案' : '正在评估改进方案', 8);
+      }
+      setStatus('active', `执行 ${name}...`);
+      break;
+
+    case 'tool_end':
+      removeToolIndicator();
+      // Only hide eval timer for evaluation tools (not generate_solutions etc.)
+      if (name === 'evaluate_all_solutions' || name === 'evaluate_single_solution') {
+        hideEvalTimer();
+      }
+      break;
+
+    case 'panel':
+      // 收到结构化面板时，彻底删除之前 Agent 的原始输出消息（不折叠、不保留）
+      // 避免评估报告等长文本堆积在对话中导致前端卡顿
+      if (currentAgentMsg) {
+        currentAgentMsg.remove();
+        currentAgentMsg = null;
+      }
+      finalizeCurrentAgentMsg(false);
+      currentDisclosureEl = null;
+      // 对 extract_review / solution_review 开启屏蔽，阻止后续 Agent 确认消息显示
+      if (name === 'extract_review' || name === 'solution_review' || name === 'single_review') {
+        state.suppressAgentMsg = true;
+      }
+      renderPanel(name, data);
+      smartScroll();
+      break;
+
+    case 'progress':
+      if (data.status === 'started' && (data.node === 'evaluate_solutions' || data.node === 'evaluate_single')) {
+        showEvalTimer('正在评估方案', 8);
+      }
+      break;
+
+    case 'disclosure_done':
+      finalizeCurrentAgentMsg(false);
+      currentDisclosureEl = null;
+      // 复用当前 Agent 消息气泡，避免生成两条消息（Agent token + disclosure_done）
+      if (currentAgentMsg) {
+        appendDisclosureLink(currentAgentMsg, data);
+        currentAgentMsg = null;
+      } else {
+        renderDisclosureDone(data);
+      }
+      smartScroll();
+      break;
+
+    case 'error':
+      addErrorMessage(data.message || '发生错误');
+      setStatus('error', '错误');
+      state.isRunning = false;
+      break;
+  }
+}
+
+// ============ Chat UI Helpers ============
+function addAgentMessage(text) {
+  const inner = document.getElementById('chatInner');
+  const msg = document.createElement('div');
+  msg.className = 'msg agent';
+  const renderedText = text ? marked.parse(text) : '';
+  msg.innerHTML = `<div class="msg-avatar">AI</div><div class="msg-body"><div class="msg-text">${renderedText}</div></div>`;
+  if (text) {
+    msg.querySelector('.msg-text')._rawText = text;
+  }
+  inner.appendChild(msg);
+  smartScroll();
+  return msg;
+}
+
+function addUserMessage(text) {
+  const inner = document.getElementById('chatInner');
+  const msg = document.createElement('div');
+  msg.className = 'msg user';
+  msg.innerHTML = `<div class="msg-body"><div class="msg-text">${escapeHtml(text)}</div></div><div class="msg-avatar">U</div>`;
+  inner.appendChild(msg);
+  smartScroll();
+}
+
+function addErrorMessage(text) {
+  const inner = document.getElementById('chatInner');
+  const el = document.createElement('div');
+  el.className = 'msg-error';
+  el.textContent = text;
+  inner.appendChild(el);
+  smartScroll();
+}
+
+function addToolIndicator(toolName) {
+  const inner = document.getElementById('chatInner');
+  const el = document.createElement('div');
+  el.className = 'tool-indicator';
+  el.id = 'tool-indicator';
+  el.innerHTML = `<span class="spinner"></span>正在执行 ${toolName}...`;
+  inner.appendChild(el);
+  smartScroll();
+}
+
+function removeToolIndicator() {
+  const el = document.getElementById('tool-indicator');
+  if (el) el.remove();
+}
+
+function scrollToBottom() {
+  smartScroll();
+}
+
+/** Smart scroll: only auto-scroll if user is near the bottom (within 120px) */
+function smartScroll() {
+  const c = document.getElementById('chatMessages');
+  const nearBottom = c.scrollHeight - c.scrollTop - c.clientHeight < 120;
+  if (nearBottom) {
+    c.scrollTop = c.scrollHeight;
+  }
+}
+
+function escapeHtml(text) {
+  const d = document.createElement('div');
+  d.textContent = text;
+  return d.innerHTML;
+}
+
+function setStatus(dotClass, text) {
+  const dot = document.getElementById('statusDot');
+  dot.className = 'dot ' + dotClass;
+  document.getElementById('statusText').textContent = text;
+}
+
+// ============ Eval Timer ============
+function showEvalTimer(label, minutes) {
+  hideEvalTimer();
+  // 清理所有旧的 eval-timer 元素，避免堆积
+  document.querySelectorAll('.eval-timer').forEach(el => el.remove());
+  const inner = document.getElementById('chatInner');
+  const el = document.createElement('div');
+  el.className = 'eval-timer';
+  el.id = 'eval-timer';
+  el.textContent = `${label}，预计约 ${minutes} 分钟`;
+  state.evalStartTime = Date.now();
+  state.evalTimerId = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - state.evalStartTime) / 1000);
+    const remaining = Math.max(0, minutes * 60 - elapsed);
+    const m = Math.floor(remaining / 60);
+    const s = remaining % 60;
+    el.textContent = `${label}，剩余 ${m}:${s.toString().padStart(2,'0')}`;
+  }, 1000);
+  inner.appendChild(el);
+  scrollToBottom();
+}
+
+function hideEvalTimer() {
+  if (state.evalTimerId) { clearInterval(state.evalTimerId); state.evalTimerId = null; }
+  const el = document.getElementById('eval-timer');
+  if (el) {
+    // 直接移除元素，不在对话中残留"评估完成"提示
+    el.remove();
+  }
+}
+
+// ============ Panel Rendering ============
+function renderPanel(panelType, data) {
+  const inner = document.getElementById('chatInner');
+  const panel = document.createElement('div');
+  panel.className = 'panel';
+
+  switch (panelType) {
+    case 'extract_review':
+      renderExtractReviewPanel(panel, data);
+      break;
+    case 'solution_review':
+      renderSolutionReviewPanel(panel, data);
+      break;
+    case 'single_review':
+      renderSingleReviewPanel(panel, data);
+      break;
+    default:
+      panel.innerHTML = `<div class="panel-title">未知面板类型: ${panelType}</div>`;
+  }
+
+  inner.appendChild(panel);
+}
+
+// ---- Extract Review Panel ----
+function renderExtractReviewPanel(panel, data) {
+  let features = {};
+  try { features = JSON.parse(data.content); } catch(e) { features = { tech_features: [], auxiliary_features: [] }; }
+
+  panel.innerHTML = `
+    <div class="panel-title"><span class="icon">&#128270;</span>技术特征提取结果</div>
+    <div class="json-toggle" onclick="toggleJsonEditor(this)">&#9998; 切换到 JSON 编辑模式</div>
+    <textarea class="json-editor" id="featureJsonEditor">${escapeHtml(data.content)}</textarea>
+    <div id="featureVisualEditor">
+      <div class="feature-list">
+        <h4>核心技术特征</h4>
+        <ul id="techFeaturesList"></ul>
+        <div class="feature-add">
+          <input type="text" id="addTechFeature" placeholder="添加核心技术特征">
+          <button onclick="addFeature('tech')">+</button>
+        </div>
+      </div>
+      <div class="feature-list">
+        <h4>辅助技术特征</h4>
+        <ul id="auxFeaturesList"></ul>
+        <div class="feature-add">
+          <input type="text" id="addAuxFeature" placeholder="添加辅助技术特征">
+          <button onclick="addFeature('aux')">+</button>
+        </div>
+      </div>
+    </div>
+    <div class="panel-actions">
+      <button class="panel-btn panel-btn-primary" onclick="confirmFeatures()">确认并继续</button>
+    </div>
+  `;
+
+  // Populate feature lists (use panel.querySelector since panel not in DOM yet)
+  renderFeatureList('techFeaturesList', features.tech_features || [], 'tech', panel);
+  renderFeatureList('auxFeaturesList', features.auxiliary_features || [], 'aux', panel);
+
+  // Store features data on panel element
+  panel._features = features;
+}
+
+function renderFeatureList(listId, items, type, parentEl) {
+  const ul = parentEl ? parentEl.querySelector('#' + listId) : document.getElementById(listId);
+  if (!ul) return;
+  ul.innerHTML = '';
+  items.forEach((item, idx) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<span>${escapeHtml(item)}</span><button class="remove-btn" onclick="removeFeature(this,'${type}',${idx})">&times;</button>`;
+    ul.appendChild(li);
+  });
+}
+
+function addFeature(type) {
+  const inputId = type === 'tech' ? 'addTechFeature' : 'addAuxFeature';
+  const input = document.getElementById(inputId);
+  if (!input || !input.value.trim()) return;
+  const panel = input.closest('.panel');
+  if (!panel || !panel._features) return;
+  const key = type === 'tech' ? 'tech_features' : 'auxiliary_features';
+  panel._features[key].push(input.value.trim());
+  const listId = type === 'tech' ? 'techFeaturesList' : 'auxFeaturesList';
+  renderFeatureList(listId, panel._features[key], type, panel);
+  input.value = '';
+}
+
+function removeFeature(btn, type, idx) {
+  const panel = btn.closest('.panel');
+  if (!panel || !panel._features) return;
+  const key = type === 'tech' ? 'tech_features' : 'auxiliary_features';
+  panel._features[key].splice(idx, 1);
+  const listId = type === 'tech' ? 'techFeaturesList' : 'auxFeaturesList';
+  renderFeatureList(listId, panel._features[key], type, panel);
+}
+
+function toggleJsonEditor(toggle) {
+  const panel = toggle.closest('.panel');
+  const visual = panel.querySelector('#featureVisualEditor');
+  const jsonEd = panel.querySelector('#featureJsonEditor');
+  if (visual.style.display === 'none') {
+    visual.style.display = '';
+    jsonEd.classList.remove('show');
+    // Parse JSON back to visual
+    try {
+      panel._features = JSON.parse(jsonEd.value);
+      renderFeatureList('techFeaturesList', panel._features.tech_features || [], 'tech', panel);
+      renderFeatureList('auxFeaturesList', panel._features.auxiliary_features || [], 'aux', panel);
+    } catch(e) {}
+    toggle.innerHTML = '&#9998; 切换到 JSON 编辑模式';
+  } else {
+    visual.style.display = 'none';
+    jsonEd.classList.add('show');
+    jsonEd.value = JSON.stringify(panel._features, null, 2);
+    toggle.innerHTML = '&#9998; 切换到可视化编辑模式';
+  }
+}
+
+function confirmFeatures() {
+  const panel = document.querySelector('.panel');
+  if (!panel || !panel._features) return;
+
+  // Check if JSON editor is active
+  const jsonEd = panel.querySelector('#featureJsonEditor');
+  let techStructure = '';
+  if (jsonEd && jsonEd.classList.contains('show')) {
+    techStructure = jsonEd.value;
+  } else {
+    techStructure = JSON.stringify(panel._features, null, 2);
+  }
+
+  // 删除确认按钮区域
+  const actions = panel.querySelector('.panel-actions');
+  if (actions) actions.remove();
+
+  // 禁用所有编辑相关的交互元素（灰显而非仅 disabled）
+  panel.querySelectorAll('.feature-add input, .feature-add button, .remove-btn, .json-toggle').forEach(el => {
+    el.style.pointerEvents = 'none';
+    el.style.opacity = '0.5';
+  });
+
+  // 添加已确认标记
+  const confirmedBadge = document.createElement('div');
+  confirmedBadge.style.cssText = 'margin-top:12px;padding:10px;background:var(--success-bg);color:var(--success);border-radius:8px;font-size:13px;font-weight:600;text-align:center;';
+  confirmedBadge.textContent = '✓ 技术特征已确认';
+  panel.appendChild(confirmedBadge);
+
+  addUserMessage('已确认技术特征，请继续生成方案');
+  sendChat('我已确认技术特征，请继续生成方案', { type: 'confirm_features', data: { tech_structure: techStructure } });
+}
+
+// ---- Solution Review Panel ----
+function renderSolutionReviewPanel(panel, data) {
+  let solutions = [];
+  try { solutions = JSON.parse(data.solutions_json); } catch(e) { solutions = []; }
+
+  let html = `<div class="panel-title"><span class="icon">&#128202;</span>方案评估结果</div>`;
+
+  solutions.forEach((sol, idx) => {
+    const passed = sol.passed;
+    const badgeClass = passed ? 'badge-pass' : 'badge-fail';
+    const badgeText = passed ? '通过' : '不通过';
+    html += `
+      <div class="solution-card" id="sol-card-${idx}">
+        <div class="solution-card-header">
+          <span class="solution-card-title">${escapeHtml(sol.title || '方案' + (idx+1))}</span>
+          <span class="badge ${badgeClass}">${badgeText}</span>
+        </div>
+        <div class="solution-card-content">${escapeHtml((sol.content || '').substring(0, 200))}${(sol.content||'').length > 200 ? '...' : ''}</div>
+        ${sol.reason ? `<div style="font-size:12px;color:var(--danger);margin-bottom:6px">不通过原因: ${escapeHtml(sol.reason)}</div>` : ''}
+        <span class="report-toggle" onclick="toggleReport(${idx})">查看评估报告</span>
+        <div class="solution-card-report" id="report-${idx}">${marked.parse(sol.report || '无报告')}</div>
+        <div class="solution-card-actions">
+          <button class="panel-btn panel-btn-primary" onclick="selectSolution(${idx},'disclosure')">生成交底书</button>
+          <button class="panel-btn panel-btn-secondary" onclick="selectSolution(${idx},'revise')">改进方案</button>
+        </div>
+      </div>
+    `;
+  });
+
+  html += `<div class="panel-actions" style="margin-top:12px"><button class="panel-btn panel-btn-danger" onclick="regenerateSolutions()">重新生成所有方案</button></div>`;
+
+  panel.innerHTML = html;
+  panel._solutions = solutions;
+}
+
+function toggleReport(idx) {
+  const el = document.getElementById('report-' + idx);
+  if (el) el.classList.toggle('expanded');
+}
+
+function selectSolution(idx, intent) {
+  const panel = document.querySelector('.panel');
+  if (!panel) return;
+  panel.querySelectorAll('button').forEach(b => b.disabled = true);
+
+  const actionText = intent === 'disclosure' ? '生成交底书' : '改进方案';
+  addUserMessage(`选择方案${idx+1}：${actionText}`);
+  sendChat(`请为方案${idx+1}${actionText}`, { type: 'select_solution', data: { selected_index: idx, intent: intent } });
+}
+
+function regenerateSolutions() {
+  const panel = document.querySelector('.panel');
+  if (!panel) return;
+  panel.querySelectorAll('button').forEach(b => b.disabled = true);
+
+  addUserMessage('请重新生成所有方案');
+  sendChat('请重新生成所有方案', { type: 'regenerate', data: {} });
+}
+
+// ---- Single Review Panel ----
+function renderSingleReviewPanel(panel, data) {
+  const passed = data.evaluation_passed;
+  const resultClass = passed ? 'pass' : 'fail';
+  const resultText = passed ? '评估通过' : '评估不通过';
+
+  let html = `
+    <div class="panel-title"><span class="icon">&#128203;</span>改进后方案评估</div>
+    <div class="eval-result ${resultClass}">${passed ? '&#10003;' : '&#10007;'} ${resultText}</div>
+  `;
+  if (data.rejection_reason) {
+    html += `<div class="eval-reason">不通过原因: ${escapeHtml(data.rejection_reason)}</div>`;
+  }
+  html += `
+    <span class="report-toggle" onclick="toggleSingleReport(this)">查看评估报告</span>
+    <div class="solution-card-report" id="single-report">${escapeHtml(data.evaluation_report || '无报告')}</div>
+    <div class="panel-actions">
+      <button class="panel-btn panel-btn-primary" onclick="agentDisclosure()">生成交底书</button>
+      <button class="panel-btn panel-btn-secondary" onclick="agentRevise()">继续改进</button>
+    </div>
+  `;
+  panel.innerHTML = html;
+}
+
+function toggleSingleReport(toggle) {
+  const report = toggle.nextElementSibling;
+  if (report) report.classList.toggle('expanded');
+}
+
+function agentDisclosure() {
+  const panel = document.querySelector('.panel');
+  if (panel) panel.querySelectorAll('button').forEach(b => b.disabled = true);
+  addUserMessage('请生成交底书');
+  sendChat('请生成交底书', null);
+}
+
+function agentRevise() {
+  const panel = document.querySelector('.panel');
+  if (panel) panel.querySelectorAll('button').forEach(b => b.disabled = true);
+  addUserMessage('请继续改进方案');
+  sendChat('请继续改进方案', null);
+}
+
+// ---- Disclosure Done ----
+function renderDisclosureDone(data) {
+  const inner = document.getElementById('chatInner');
+  const msg = document.createElement('div');
+  msg.className = 'msg agent';
+  msg.innerHTML = `
+    <div class="msg-avatar">AI</div>
+    <div class="msg-body">
+      <div class="msg-text">交底书已生成 (${data.length} 字)</div>
+      <a class="download-link" href="javascript:void(0)" onclick="downloadDisclosure('${data.file_name}')">&#128196; 下载交底书 (${data.file_name})</a>
+    </div>
+  `;
+  inner.appendChild(msg);
+}
+
+function appendDisclosureLink(msgEl, data) {
+  const body = msgEl.querySelector('.msg-body');
+  if (!body) return;
+  const link = document.createElement('a');
+  link.className = 'download-link';
+  link.href = 'javascript:void(0)';
+  link.onclick = function() { downloadDisclosure(data.file_name); };
+  link.innerHTML = `&#128196; 下载交底书 (${data.file_name})`;
+  body.appendChild(link);
+}
+
+function downloadDisclosure(fileName) {
+  const url = '/files/disclosure_output/' + fileName;
+  fetch(url)
+    .then(r => {
+      if (!r.ok) throw new Error('下载失败: ' + r.status);
+      return r.blob();
+    })
+    .then(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    })
+    .catch(err => alert(err.message));
+}
+
+// ============ Send Chat ============
+async function sendMessage() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text || state.isRunning) return;
+  input.value = '';
+  addUserMessage(text);
+  await sendChat(text, null);
+}
+
+async function sendChat(message, panelAction) {
+  if (state.isRunning) return;
+  state.isRunning = true;
+  setStatus('active', '处理中');
+  currentAgentMsg = null;
+  currentDisclosureEl = null;
+
+  try {
+    const body = { thread_id: state.threadId, message: message };
+    if (panelAction) body.panel_action = panelAction;
+
+    console.log('[V2] Sending chat, threadId:', state.threadId, 'msg:', message.substring(0, 50));
+    const r = await fetch('/agent/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    console.log('[V2] Chat response:', r.status, r.ok);
+    if (!r.ok) {
+      const errText = await r.text();
+      addErrorMessage('请求失败: ' + r.status + ' ' + errText);
+      setStatus('error', '请求失败');
+      state.isRunning = false;
+      return;
+    }
+    await readSSE(r, handleEvent);
+  } catch (err) {
+    console.error('[V2] Chat error:', err);
+    addErrorMessage('发送失败: ' + err.message);
+    setStatus('error', '连接失败');
+  }
+
+  // Finalize any remaining agent message after stream ends
+  finalizeCurrentAgentMsg(false);
+  state.isRunning = false;
+  setStatus('idle', '就绪');
+}
+
+// ============ Go Back ============
+function goBack() {
+  if (state.currentReader) {
+    state.currentReader.cancel();
+    state.currentReader = null;
+  }
+  state.isRunning = false;
+
+  // Cleanup session
+  if (state.threadId) {
+    navigator.sendBeacon('/agent/cleanup', JSON.stringify({ thread_id: state.threadId }));
+  }
+
+  state.threadId = null;
+  state.uploadFilePath = null;
+  state.uploadFileName = null;
+
+  // Clear chat
+  document.getElementById('chatInner').innerHTML = '';
+
+  showPage('upload');
+  document.getElementById('parsingStatus').classList.remove('show');
+  document.getElementById('manualText').value = '';
+  document.getElementById('uploadZone').innerHTML = `
+    <div class="upload-zone-icon">&#128196;</div>
+    <div class="upload-zone-text">拖拽文件到此处，或点击选择文件</div>
+    <div class="upload-zone-hint">支持 PDF, DOCX, PPTX, 图片等格式，最大 50MB</div>
+  `;
+}
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+  if (state.threadId) {
+    navigator.sendBeacon('/agent/cleanup', JSON.stringify({ thread_id: state.threadId }));
+  }
+});
+</script>
+</body>
+</html>

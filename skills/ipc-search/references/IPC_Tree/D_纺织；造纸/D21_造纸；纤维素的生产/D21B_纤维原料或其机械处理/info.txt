@@ -1,0 +1,6 @@
+Code: D21B
+Level: subclass
+Section: 纺织或未列入其他类的柔性材料
+Title: 纤维原料或其机械处理
+========================================
+(no additional notes)

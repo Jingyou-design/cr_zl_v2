@@ -1,0 +1,6 @@
+Code: C06D
+Level: subclass
+Section: 化学
+Title: 烟雾发生装置；毒气攻击剂；爆炸或推进用气体的产生（化学部分）
+========================================
+(no additional notes)

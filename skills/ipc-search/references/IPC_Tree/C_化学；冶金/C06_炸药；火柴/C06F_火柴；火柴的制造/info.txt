@@ -1,0 +1,6 @@
+Code: C06F
+Level: subclass
+Section: 化学
+Title: 火柴；火柴的制造
+========================================
+(no additional notes)

@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Runtime output
+files/agent-*/
+files/disclosure_output/*
+files/mineru_output/*
+!files/disclosure_output/.gitkeep
+!files/mineru_output/.gitkeep
+
+# Environment
+.env
+
+# Misc
+.DS_Store
+*.log

@@ -1,0 +1,6 @@
+Code: C09H
+Level: subclass
+Section: 化学
+Title: 动物胶或明胶的制备
+========================================
+(no additional notes)

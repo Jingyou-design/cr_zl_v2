@@ -1,0 +1,6 @@
+Code: E06C
+Level: subclass
+Section: 建筑
+Title: 梯子(E04F11/00优先；阶梯式凳子入A47C12/00；船上用梯入B63B，飞机用梯入B64； 脚手架入E04G)
+========================================
+(no additional notes)

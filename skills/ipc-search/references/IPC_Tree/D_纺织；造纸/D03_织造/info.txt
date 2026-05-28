@@ -1,0 +1,6 @@
+Code: D03
+Level: class
+Section: 纺织或未列入其他类的柔性材料
+Title: 织造
+========================================
+(no additional notes)

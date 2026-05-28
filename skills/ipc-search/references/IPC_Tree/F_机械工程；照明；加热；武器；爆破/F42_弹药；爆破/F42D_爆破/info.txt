@@ -1,0 +1,6 @@
+Code: F42D
+Level: subclass
+Section: 武器；爆破
+Title: 爆破（引信，例如导火索入C06C5/00；爆破筒入F42B3/00）
+========================================
+(no additional notes)

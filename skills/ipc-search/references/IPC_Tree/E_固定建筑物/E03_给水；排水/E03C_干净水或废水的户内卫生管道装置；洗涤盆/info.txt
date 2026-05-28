@@ -1,0 +1,6 @@
+Code: E03C
+Level: subclass
+Section: 建筑
+Title: 干净水或废水的户内卫生管道装置(不接通给水总管道和污水管道的入A47K；用于地下 水的设备入E03B，E03F)；洗涤盆
+========================================
+(no additional notes)

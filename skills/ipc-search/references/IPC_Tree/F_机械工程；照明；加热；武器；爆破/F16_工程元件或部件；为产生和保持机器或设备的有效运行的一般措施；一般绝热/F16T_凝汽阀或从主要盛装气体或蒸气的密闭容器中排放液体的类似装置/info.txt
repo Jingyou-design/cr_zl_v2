@@ -1,0 +1,6 @@
+Code: F16T
+Level: subclass
+Section: 发动机或泵
+Title: 凝汽阀或从主要盛装气体或蒸气的密闭容器中排放液体的类似装置
+========================================
+(no additional notes)

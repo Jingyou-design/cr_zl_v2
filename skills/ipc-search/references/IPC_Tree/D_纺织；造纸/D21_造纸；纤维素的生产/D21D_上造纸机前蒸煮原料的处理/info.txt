@@ -1,0 +1,6 @@
+Code: D21D
+Level: subclass
+Section: 纺织或未列入其他类的柔性材料
+Title: 上造纸机前蒸煮原料的处理
+========================================
+(no additional notes)

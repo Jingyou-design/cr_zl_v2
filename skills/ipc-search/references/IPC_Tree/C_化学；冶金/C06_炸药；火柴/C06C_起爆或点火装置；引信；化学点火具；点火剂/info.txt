@@ -1,0 +1,6 @@
+Code: C06C
+Level: subclass
+Section: 化学
+Title: 起爆或点火装置；引信；化学点火具；点火剂
+========================================
+(no additional notes)

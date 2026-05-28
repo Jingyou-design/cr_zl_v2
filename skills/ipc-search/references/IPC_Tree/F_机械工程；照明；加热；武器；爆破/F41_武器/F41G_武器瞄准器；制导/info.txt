@@ -1,0 +1,6 @@
+Code: F41G
+Level: subclass
+Section: 武器；爆破
+Title: 武器瞄准器；制导（其光学方面的入G02B）
+========================================
+(no additional notes)

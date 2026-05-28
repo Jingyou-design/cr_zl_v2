@@ -1,0 +1,6 @@
+Code: D06J
+Level: subclass
+Section: 纺织或未列入其他类的柔性材料
+Title: 织物或服装的打褶、打裥或褶裥处理（缝纫入D05B）
+========================================
+(no additional notes)

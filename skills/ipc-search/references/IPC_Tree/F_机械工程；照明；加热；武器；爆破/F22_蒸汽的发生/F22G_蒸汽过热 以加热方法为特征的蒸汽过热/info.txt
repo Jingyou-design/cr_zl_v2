@@ -1,0 +1,6 @@
+Code: F22G
+Level: subclass
+Section: 发动机或泵
+Title: 蒸汽过热 以加热方法为特征的蒸汽过热
+========================================
+(no additional notes)

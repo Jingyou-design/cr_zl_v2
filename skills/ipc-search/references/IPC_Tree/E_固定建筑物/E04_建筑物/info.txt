@@ -1,0 +1,6 @@
+Code: E04
+Level: class
+Section: 建筑
+Title: 建筑物
+========================================
+(no additional notes)

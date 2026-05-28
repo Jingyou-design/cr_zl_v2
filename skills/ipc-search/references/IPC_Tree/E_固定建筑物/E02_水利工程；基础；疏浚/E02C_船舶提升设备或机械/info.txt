@@ -1,0 +1,6 @@
+Code: E02C
+Level: subclass
+Section: 建筑
+Title: 船舶提升设备或机械
+========================================
+(no additional notes)

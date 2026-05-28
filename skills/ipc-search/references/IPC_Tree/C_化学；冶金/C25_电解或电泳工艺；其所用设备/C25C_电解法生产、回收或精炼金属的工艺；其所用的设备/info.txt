@@ -1,0 +1,6 @@
+Code: C25C
+Level: subclass
+Section: 化学
+Title: 电解法生产、回收或精炼金属的工艺；其所用的设备（阳极或阴极保护入C23F13/00；单 晶生长入C30B）
+========================================
+(no additional notes)

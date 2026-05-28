@@ -1,0 +1,6 @@
+Code: F03H
+Level: subclass
+Section: 发动机或泵
+Title: 不包含在其他类目中的反推力的产生（来自燃烧生成物入F02K）
+========================================
+(no additional notes)

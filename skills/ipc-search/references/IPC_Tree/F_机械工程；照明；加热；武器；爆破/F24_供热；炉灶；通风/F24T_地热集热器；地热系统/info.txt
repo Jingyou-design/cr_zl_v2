@@ -1,0 +1,6 @@
+Code: F24T
+Level: subclass
+Section: 发动机或泵
+Title: 地热集热器；地热系统
+========================================
+(no additional notes)

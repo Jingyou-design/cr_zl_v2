@@ -1,0 +1,23 @@
+[project]
+name = "zl-demo"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "deepagents>=0.5.2",
+    "dotenv>=0.9.9",
+    "langchain-deepseek>=1.0.1",
+    "pytest>=9.0.3",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "python-multipart>=0.0.9",
+    "beautifulsoup4>=4.14.3",
+]
+
+[tool.setuptools]
+packages = ["app"]
+
+[[tool.uv.index]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true

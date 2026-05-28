@@ -1,0 +1,6 @@
+Code: C05D
+Level: subclass
+Section: 化学
+Title: 不包含在C05B、C05C小类中的无机肥料；产生二氧化碳的肥料
+========================================
+(no additional notes)
