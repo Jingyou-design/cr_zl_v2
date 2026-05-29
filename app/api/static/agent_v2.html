@@ -594,8 +594,8 @@ function handleEvent(evt) {
       }
       finalizeCurrentAgentMsg(false);
       currentDisclosureEl = null;
-      // 对 extract_review / solution_review 开启屏蔽，阻止后续 Agent 确认消息显示
-      if (name === 'extract_review' || name === 'solution_review' || name === 'single_review') {
+      // 对结构化面板开启屏蔽，阻止后续 Agent 确认消息显示
+      if (name === 'extract_review' || name === 'solution_review' || name === 'single_review' || name === 'solution_select' || name === 'improve_review') {
         state.suppressAgentMsg = true;
       }
       renderPanel(name, data);
@@ -743,8 +743,14 @@ function renderPanel(panelType, data) {
     case 'extract_review':
       renderExtractReviewPanel(panel, data);
       break;
+    case 'solution_select':
+      renderSolutionSelectPanel(panel, data);
+      break;
     case 'solution_review':
       renderSolutionReviewPanel(panel, data);
+      break;
+    case 'improve_review':
+      renderImproveReviewPanel(panel, data);
       break;
     case 'single_review':
       renderSingleReviewPanel(panel, data);
@@ -917,6 +923,57 @@ function renderSolutionReviewPanel(panel, data) {
 
   panel.innerHTML = html;
   panel._solutions = solutions;
+}
+
+// ---- Solution Select Panel (生成后、评估前) ----
+function renderSolutionSelectPanel(panel, data) {
+  let solutions = [];
+  try { solutions = JSON.parse(data.solutions_json); } catch(e) { solutions = []; }
+
+  let html = `<div class="panel-title"><span class="icon">&#128161;</span>生成的技术方案</div>`;
+  html += `<div style="font-size:13px;color:var(--text2);margin-bottom:12px;">请选择要评估的方案，或点击“评估全部方案”</div>`;
+
+  solutions.forEach((sol, idx) => {
+    html += `
+      <div class="solution-card" id="select-card-${idx}">
+        <div class="solution-card-header">
+          <span class="solution-card-title">${escapeHtml(sol.title || '方案' + (idx+1))}</span>
+        </div>
+        <div class="solution-card-content">${escapeHtml((sol.content || '').substring(0, 200))}${(sol.content||'').length > 200 ? '...' : ''}</div>
+        <div class="solution-card-actions">
+          <button class="panel-btn panel-btn-primary" onclick="evaluateSolution(${idx})">评估此方案</button>
+        </div>
+      </div>
+    `;
+  });
+
+  html += `
+    <div class="panel-actions" style="margin-top:12px">
+      <button class="panel-btn panel-btn-primary" onclick="evaluateAllSolutions()">评估全部方案</button>
+      <button class="panel-btn panel-btn-secondary" onclick="regenerateSolutions()">重新生成方案</button>
+    </div>
+  `;
+
+  panel.innerHTML = html;
+  panel._solutions = solutions;
+}
+
+function evaluateSolution(idx) {
+  const panel = document.querySelector('.panel');
+  if (!panel) return;
+  panel.querySelectorAll('button').forEach(b => b.disabled = true);
+
+  addUserMessage(`请评估方案${idx+1}`);
+  sendChat(`请评估方案${idx+1}`, { type: 'select_solution', data: { selected_index: idx, intent: 'evaluate' } });
+}
+
+function evaluateAllSolutions() {
+  const panel = document.querySelector('.panel');
+  if (!panel) return;
+  panel.querySelectorAll('button').forEach(b => b.disabled = true);
+
+  addUserMessage('请评估全部方案');
+  sendChat('请评估全部方案', null);
 }
 
 function toggleReport(idx) {

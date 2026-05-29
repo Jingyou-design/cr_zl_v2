@@ -51,7 +51,7 @@ def build_eval_subagent_graph():
 
     agent = create_agent(
         model=ChatDeepSeek(
-            model="deepseek-v4-pro",
+            model="deepseek-v4-flash",
             extra_body={"thinking": {"type": "disabled"}},
         ),
         system_prompt=_EVAL_SYSTEM_PROMPT,

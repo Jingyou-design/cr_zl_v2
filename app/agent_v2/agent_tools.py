@@ -30,19 +30,19 @@ from app.controller.report_parser import parse_evaluation_report
 # ---------- LLM 实例 ----------
 
 _llm = ChatDeepSeek(
-    model="deepseek-v4-pro",
+    model="deepseek-v4-flash",
     extra_body={"thinking": {"type": "disabled"}},
     temperature=0.5,
 )
 
 _llm_creative = ChatDeepSeek(
-    model="deepseek-v4-pro",
+    model="deepseek-v4-flash",
     extra_body={"thinking": {"type": "disabled"}},
     temperature=1,
 )
 
 _llm_zero = ChatDeepSeek(
-    model="deepseek-v4-pro",
+    model="deepseek-v4-flash",
     extra_body={"thinking": {"type": "disabled"}},
     temperature=0,
 )
@@ -162,7 +162,7 @@ async def extract_tech_structure() -> str:
 @tool
 async def generate_solutions() -> str:
     """基于确认的技术结构生成多个技术方案。
-    生成后应自动调用 evaluate_all_solutions 进行评估，不需要用户确认。"""
+    生成后必须向用户展示方案列表并等待用户选择评估方式，不能自动调用评估工具。"""
     session = get_session()
     tech_structure = session.tech_structure
 
@@ -192,7 +192,13 @@ async def generate_solutions() -> str:
     session.current_solution = ""
     session.selected_index = -1
 
-    return f"已生成 {len(solutions)} 个技术方案，请继续调用 evaluate_all_solutions 进行评估。"
+    dispatch_custom_event("panel", {
+        "panel_type": "solution_select",
+        "solutions_json": json.dumps(solutions, ensure_ascii=False),
+        "message": "请查看生成的方案，选择要评估的方案或评估全部",
+    })
+
+    return f"已生成 {len(solutions)} 个技术方案，请向用户展示方案列表并等待用户选择评估方式（评估单个方案或评估全部）。绝不能在用户选择前自动调用评估工具。"
 
 
 # ---------- 工具 3: 并行评估所有方案 ----------
@@ -292,7 +298,7 @@ async def evaluate_all_solutions() -> str:
 @tool
 async def improve_solution() -> str:
     """根据评估反馈改进当前方案。
-    改进后应自动调用 evaluate_single_solution 进行评估。"""
+    改进后必须向用户展示改进结果并等待用户确认，不能自动调用 evaluate_single_solution。"""
     session = get_session()
     document = session.document
     rejection_reason = session.rejection_reason
@@ -374,17 +380,35 @@ async def improve_solution() -> str:
         "revision_count": session.revision_count,
     })
 
-    return "方案已改进，请继续调用 evaluate_single_solution 评估改进后的方案。"
+    dispatch_custom_event("panel", {
+        "panel_type": "improve_review",
+        "current_solution": improved_solution,
+        "revision_count": session.revision_count,
+        "message": "改进方案已完成，请确认是否进行评估",
+    })
+
+    return "方案已改进，请向用户展示改进结果并等待确认。绝不能自动调用 evaluate_single_solution。"
 
 
 # ---------- 工具 5: 评估单个方案 ----------
 
 @tool
-async def evaluate_single_solution() -> str:
-    """评估改进后的单个技术方案的专利新颖性和创造性。
-    调用后必须向用户展示评估结果并等待决策。"""
+async def evaluate_single_solution(index: int = -1) -> str:
+    """评估指定索引或当前选中的单个技术方案的专利新颖性和创造性。
+
+    当用户要求评估某个特定方案时使用此工具，传入该方案的索引（从0开始，方案1对应index=0）。
+    当用户要求评估改进后的当前方案时，可以不传 index 或传 -1。
+
+    调用后必须向用户展示评估结果并等待决策，不能自动执行下一步。"""
     session = get_session()
-    solution = session.current_solution
+
+    if 0 <= index < len(session.solutions):
+        solution = session.solutions[index].get("content", "")
+        session.current_solution = solution
+        session.selected_index = index
+    else:
+        solution = session.current_solution
+
     thread_id = current_thread_id.get()
 
     if not solution:
