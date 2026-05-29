@@ -125,24 +125,24 @@ async def extract_tech_structure() -> str:
 
     prompt = f"""请从以下专利文档中提取技术特征，以 JSON 格式输出。
 
-文档内容：
-{document}
-
-请严格按以下 JSON 格式输出（不要加 markdown 代码块标记）：
-{{
-  "tech_features": ["核心技术特征1", "核心技术特征2", ...],
-  "auxiliary_features": ["辅助技术特征1", ...]
-}}
-
-字段说明：
-- tech_features：核心技术特征，指发明的关键结构、方法步骤、连接关系、控制逻辑等，是发明区别于现有技术的本质特征。必须提取。
-- auxiliary_features：辅助技术特征，指对核心技术特征起支撑、优化作用的次级结构或步骤。如果没有明显可区分的辅助特征，填空数组 []。
-
-注意：
-- 只能写技术特征（结构/方法/关系），绝不能写效果或优点。
-- auxiliary_features 可以为空数组，不要强行凑数。
-
-只输出 JSON，不要有多余解释。"""
+            文档内容：
+            {document}
+            
+            请严格按以下 JSON 格式输出（不要加 markdown 代码块标记）：
+            {{
+              "tech_features": ["核心技术特征1", "核心技术特征2", ...],
+              "auxiliary_features": ["辅助技术特征1", ...]
+            }}
+            
+            字段说明：
+            - tech_features：核心技术特征，指发明的关键结构、方法步骤、连接关系、控制逻辑等，是发明区别于现有技术的本质特征。必须提取。
+            - auxiliary_features：辅助技术特征，指对核心技术特征起支撑、优化作用的次级结构或步骤。如果没有明显可区分的辅助特征，填空数组 []。
+            
+            注意：
+            - 只能写技术特征（结构/方法/关系），绝不能写效果或优点。
+            - auxiliary_features 可以为空数组，不要强行凑数。
+            
+            只输出 JSON，不要有多余解释。"""
 
     raw = await _stream_llm(prompt)
     result = _try_parse_json(raw)
@@ -168,18 +168,18 @@ async def generate_solutions() -> str:
 
     prompt = f"""你是一个专利工程师。请基于以下技术结构生成多个技术方案，方案必须紧扣 tech_features 中的核心技术特征，可适当利用 auxiliary_features 中的辅助特征。不要引入未列出的特征，只描述核心发明点和关键实现方式。
 
-技术结构：
-{tech_structure}
-
-请严格按以下 JSON 格式输出（不要加 markdown 代码块标记）：
-[
-  {{"title": "方案1", "content": "方案1的详细描述..."}},
-  {{"title": "方案2", "content": "方案2的详细描述..."}},
-  {{"title": "方案3", "content": "方案3的详细描述..."}}
-]
-
-生成3-4个方案，每个方案的 content 应包含核心发明点和关键实现方式，200字以内。
-只输出 JSON 数组，不要有多余解释。"""
+            技术结构：
+            {tech_structure}
+            
+            请严格按以下 JSON 格式输出（不要加 markdown 代码块标记）：
+            [
+              {{"title": "方案1", "content": "方案1的详细描述..."}},
+              {{"title": "方案2", "content": "方案2的详细描述..."}},
+              {{"title": "方案3", "content": "方案3的详细描述..."}}
+            ]
+            
+            生成3-4个方案，每个方案的 content 应包含核心发明点和关键实现方式，200字以内。
+            只输出 JSON 数组，不要有多余解释。"""
 
     raw = await _stream_llm(prompt, llm=_llm_creative)
     parsed = _try_parse_json(raw)
@@ -467,7 +467,7 @@ async def search_patent(patent_number: str) -> str:
     if str(skill_path) not in sys.path:
         sys.path.insert(0, str(skill_path))
 
-    from patenthub_client import api_get
+    from skills.patenthub.scripts.patenthub_client import api_get
 
     # Step 1: 搜索专利
     search_result = api_get("/api/s", {"q": f"number:{patent_number}", "ps": 1})
